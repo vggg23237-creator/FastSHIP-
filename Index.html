@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>FastSHIP — Магазин одежды</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <!-- Библиотека Supabase -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header class="header">
+        <div class="logo-container">
+            <div class="logo">
+                <img src="logo.png" alt="FastSHIP">
+            </div>
+        </div>
+        <div class="header-actions">
+            <button class="icon-btn" id="btnFav">❤️<span class="badge-count" id="favCount"></span></button>
+            <button class="icon-btn" id="btnCart">🛒<span class="badge-count" id="cartCount"></span></button>
+            <button class="contact-btn" id="btnContact">💬</button>
+        </div>
+    </header>
+
+    <div class="banner">🚚 Бесплатная доставка от 5000 ₽ · Доставка 2–5 дней</div>
+
+    <div class="search-container">
+        <input type="text" id="searchInput" placeholder="Поиск одежды...">
+    </div>
+
+    <div class="sort-container">
+        <select id="sortSelect">
+            <option value="default">По умолчанию</option>
+            <option value="price-asc">Сначала дешёвые</option>
+            <option value="price-desc">Сначала дорогие</option>
+            <option value="discount">По размеру скидки</option>
+        </select>
+    </div>
+
+    <div class="categories" id="categories">
+        <button class="category active" data-cat="all">Все</button>
+        <button class="category" data-cat="hoodie">Худи</button>
+        <button class="category" data-cat="tshirt">Футболки</button>
+        <button class="category" data-cat="pants">Штаны</button>
+        <button class="category" data-cat="jacket">Куртки</button>
+    </div>
+
+    <main class="products" id="productsGrid"></main>
+
+    <a class="floating-btn" href="https://t.me/FastSHIPmanager" target="_blank">💬 Заказать у менеджера</a>
+
+    <div class="modal" id="productModal">
+        <div class="modal-content">
+            <button class="modal-close" data-close="productModal">✕</button>
+            <div id="productModalBody"></div>
+        </div>
+    </div>
+
+    <div class="modal" id="cartModal">
+        <div class="modal-content">
+            <button class="modal-close" data-close="cartModal">✕</button>
+            <h2 class="modal-title">🛒 Корзина</h2>
+            <div id="cartBody"></div>
+            <div id="cartFooter"></div>
+        </div>
+    </div>
+
+    <div class="modal" id="favoritesModal">
+        <div class="modal-content">
+            <button class="modal-close" data-close="favoritesModal">✕</button>
+            <h2 class="modal-title">❤️ Избранное</h2>
+            <div id="favoritesBody"></div>
+        </div>
+    </div>
+
+    <div class="modal" id="reviewsModal">
+        <div class="modal-content">
+            <button class="modal-close" data-close="reviewsModal">✕</button>
+            <h2 class="modal-title">⭐ Отзывы покупателей</h2>
+            <div id="reviewsBody"></div>
+        </div>
+    </div>
+
+    <div class="modal" id="ordersModal">
+        <div class="modal-content">
+            <button class="modal-close" data-close="ordersModal">✕</button>
+            <h2 class="modal-title">📦 Мои заказы</h2>
+            <div id="ordersBody"></div>
+        </div>
+    </div>
+
+    <div class="modal" id="adminModal">
+        <div class="modal-content">
+            <button class="modal-close" data-close="adminModal">✕</button>
+            <h2 class="modal-title">⚙️ Админка</h2>
+            <div class="admin-tabs">
+                <button class="admin-tab active" data-tab="orders">Заказы</button>
+                <button class="admin-tab" data-tab="products">Товары</button>
+                <button class="admin-tab" data-tab="reviews">Отзывы</button>
+            </div>
+            <div id="adminBody"></div>
+        </div>
+    </div>
+
+    <nav class="bottom-nav">
+        <button id="navHome">🏠<span>Главная</span></button>
+        <button id="navOrders">📦<span>Заказы</span></button>
+        <button id="navReviews">⭐<span>Отзывы</span></button>
+        <button id="navAdmin" style="display:none">⚙️<span>Админ</span></button>
+    </nav>
+
+    <script src="script.js"></script>
+</body>
+</html>
