@@ -48,7 +48,8 @@ async function loadData() {
     if (!pErr && p) {
         products = p.map(x => ({
             id: x.id, name: x.name, price: x.price, oldPrice: x.old_price,
-            category: x.category, emoji: x.emoji, image: x.image, badge: x.badge, sizes: x.sizes
+            category: x.category, emoji: x.emoji, image: x.image, badge: x.badge, 
+            sizes: x.sizes, description: x.description
         }));
     } else if (pErr) {
         console.error('Ошибка загрузки товаров:', pErr);
@@ -209,6 +210,7 @@ function openProduct(id) {
             <h2>${p.name}</h2>
             <div class="price-row"><span class="price">${formatPrice(p.price)}</span>${p.oldPrice ? `<span class="old-price">${formatPrice(p.oldPrice)}</span>` : ''}</div>
             ${avg ? `<div style="color:#ffcc00;margin-bottom:12px">⭐ ${avg} · ${pReviews.length} отзывов</div>` : ''}
+            ${p.description ? `<p style="font-size:14px;line-height:1.4;color:var(--text);margin-bottom:16px;padding:10px;background:rgba(0,0,0,0.03);border-radius:8px">${p.description}</p>` : ''}
             <p style="font-size:13px;color:var(--hint);margin-bottom:8px">Выберите размер:</p>
             <div class="sizes" id="sizesContainer">${p.sizes.map(s => `<button class="size-btn ${selectedSizes[id]===s?'selected':''}" data-size="${s}">${s}</button>`).join('')}</div>
             <div class="detail-actions">
@@ -412,7 +414,7 @@ async function switchAdminTab(tab, btn) {
     }
 
     if (tab === 'products') {
-        body.innerHTML = `<div class="admin-form"><input id="newName" placeholder="Название товара"><input id="newPrice" type="number" placeholder="Цена (₽)"><input id="newOldPrice" type="number" placeholder="Старая цена"><select id="newCategory"><option value="hoodie">Худи</option><option value="tshirt">Футболки</option><option value="pants">Штаны</option><option value="jacket">Куртки</option></select><input id="newEmoji" placeholder="Эмодзи 🧥" maxlength="4"><input id="newImage" placeholder="Ссылка на фото"><input id="newBadge" placeholder="Бейдж (NEW)"><button id="addProductBtn">➕ Добавить товар</button></div><div>${products.map(p => `<div class="admin-item"><div class="admin-item-info"><b>${p.emoji} ${p.name}</b><span>${formatPrice(p.price)} · ${p.category}</span></div><button class="admin-del" data-del-product="${p.id}">🗑</button></div>`).join('')}</div>`;
+        body.innerHTML = `<div class="admin-form"><input id="newName" placeholder="Название товара"><input id="newPrice" type="number" placeholder="Цена (₽)"><input id="newOldPrice" type="number" placeholder="Старая цена"><select id="newCategory"><option value="hoodie">Худи</option><option value="tshirt">Футболки</option><option value="pants">Штаны</option><option value="jacket">Куртки</option></select><input id="newEmoji" placeholder="Эмодзи 🧥" maxlength="4"><input id="newImage" placeholder="Ссылка на фото"><input id="newBadge" placeholder="Бейдж (NEW)"><textarea id="newDescription" placeholder="Описание товара (ткань, крой и т.д.)" rows="2"></textarea><button id="addProductBtn">➕ Добавить товар</button></div><div>${products.map(p => `<div class="admin-item"><div class="admin-item-info"><b>${p.emoji} ${p.name}</b><span>${formatPrice(p.price)} · ${p.category}</span></div><button class="admin-del" data-del-product="${p.id}">🗑</button></div>`).join('')}</div>`;
         document.getElementById('addProductBtn').addEventListener('click', adminAddProduct);
         document.querySelectorAll('[data-del-product]').forEach(b => b.addEventListener('click', () => adminDeleteProduct(+b.dataset.delProduct)));
     }
@@ -438,11 +440,12 @@ async function adminAddProduct() {
     const emoji = document.getElementById('newEmoji').value || '👕';
     const image = document.getElementById('newImage').value.trim();
     const badge = document.getElementById('newBadge').value || null;
+    const description = document.getElementById('newDescription').value.trim() || null;
 
     if (!name || !price) { alert('Заполни название и цену'); return; }
 
     await db.from('products').insert([{
-        name, price, old_price: oldPrice, category, emoji, image: image || null, badge, sizes: ['S','M','L','XL']
+        name, price, old_price: oldPrice, category, emoji, image: image || null, badge, sizes: ['S','M','L','XL'], description
     }]);
     
     await loadData();
