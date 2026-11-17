@@ -4,8 +4,8 @@
     --bg: var(--tg-theme-bg-color, #ffffff);
     --text: var(--tg-theme-text-color, #1a1a1a);
     --hint: var(--tg-theme-hint-color, #999999);
+    --card: var(--tg-theme-secondary-bg-color, #f5f5f5); /* Цвет карточек подстраивается под тему */
     --accent: #2AABEE;
-    --card: #f5f5f5;
     --danger: #ff3b30;
     --success: #34c759;
 }
@@ -30,20 +30,8 @@ body {
 }
 
 .logo-container { display: flex; align-items: center; gap: 10px; }
-
-.logo { 
-    width: 220px; 
-    height: 70px; 
-    display: flex; 
-    align-items: center; 
-    justify-content: flex-start; 
-}
-.logo img {
-    width: 100%;
-    height: 100%;
-    object-fit: contain; 
-}
-
+.logo { width: 220px; height: 70px; display: flex; align-items: center; justify-content: flex-start; }
+.logo img { width: 100%; height: 100%; object-fit: contain; }
 .header-actions { display: flex; gap: 6px; align-items: center; }
 
 .icon-btn {
@@ -64,11 +52,7 @@ body {
     width: 40px; height: 40px; border-radius: 12px; font-size: 16px; cursor: pointer;
 }
 
-.banner {
-    background: linear-gradient(135deg, #2AABEE, #229ED9);
-    color: white; text-align: center; padding: 8px;
-    font-size: 12px; font-weight: 600;
-}
+.banner { background: linear-gradient(135deg, #2AABEE, #229ED9); color: white; text-align: center; padding: 8px; font-size: 12px; font-weight: 600; }
 
 .search-container { padding: 12px 16px 8px; }
 #searchInput {
@@ -94,16 +78,20 @@ body {
 }
 .category.active { background: var(--accent); color: white; border-color: var(--accent); }
 
-/* Сетка и карточки */
+/* === ТОВАРЫ === */
 .products { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; padding: 12px 16px; }
 .product-card {
-    background: var(--card); border-radius: 16px; overflow: hidden;
-    display: flex; flex-direction: column; position: relative;
+    background: var(--card); 
+    border-radius: 16px; 
+    overflow: hidden;
+    display: flex; 
+    flex-direction: column; 
+    position: relative;
     height: 100%;
 }
 .product-image {
     width: 100%; aspect-ratio: 1;
-    background: linear-gradient(135deg, #e0e0e0, #f5f5f5);
+    background: var(--card);
     display: flex; align-items: center; justify-content: center;
     font-size: 48px; position: relative; cursor: pointer; overflow: hidden;
     flex-shrink: 0;
@@ -126,12 +114,14 @@ body {
     flex-direction: column; 
     gap: 4px; 
     flex-grow: 1; 
+    background: var(--card);
 }
 
 .product-name {
     font-size: 13px; font-weight: 600; line-height: 1.3;
     display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
     overflow: hidden; height: 34px; 
+    color: var(--text);
     cursor: pointer;
 }
 .product-rating { font-size: 11px; color: #ffcc00; }
@@ -141,25 +131,24 @@ body {
 .product-actions {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 6px;
     margin-top: auto;
     padding-top: 8px;
 }
 
 .buy-btn {
-    padding: 12px; 
-    border: none; border-radius: 10px;
+    padding: 12px; border: none; border-radius: 10px;
     background: var(--accent); color: white; font-size: 13px; font-weight: 600; cursor: pointer;
 }
 
 .buy-now-btn {
-    padding: 12px; 
-    border: none; border-radius: 10px;
+    padding: 12px; border: none; border-radius: 10px;
     background: var(--success); color: white; font-size: 13px; font-weight: 600;
     cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 4px;
 }
 .buy-now-btn:active { opacity: 0.8; }
 
+/* === НИЖНЕЕ МЕНЮ === */
 .floating-btn {
     position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%);
     background: var(--accent); color: white; text-decoration: none;
@@ -178,6 +167,7 @@ body {
 }
 .bottom-nav button span { font-size: 10px; font-weight: 500; color: var(--hint); }
 
+/* === МОДАЛКИ === */
 .modal {
     display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5);
     z-index: 200; align-items: flex-end; justify-content: center;
@@ -192,11 +182,12 @@ body {
 .modal-close {
     position: sticky; top: 0; float: right; background: var(--card); border: none;
     width: 32px; height: 32px; border-radius: 50%; font-size: 16px; cursor: pointer; z-index: 10;
+    color: var(--text);
 }
 .modal-title { font-size: 18px; font-weight: 700; margin-bottom: 16px; }
 
 .product-detail-image {
-    width: 100%; aspect-ratio: 1; background: linear-gradient(135deg, #e0e0e0, #f5f5f5);
+    width: 100%; aspect-ratio: 1; background: var(--card);
     border-radius: 16px; display: flex; align-items: center; justify-content: center;
     font-size: 96px; margin-bottom: 16px; overflow: hidden;
 }
@@ -209,6 +200,7 @@ body {
 .size-btn {
     padding: 10px 16px; border: 1px solid rgba(0,0,0,0.15); background: transparent;
     border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer;
+    color: var(--text);
 }
 .size-btn.selected { background: var(--accent); color: white; border-color: var(--accent); }
 .detail-actions { display: flex; gap: 8px; margin-top: 20px; }
@@ -222,6 +214,7 @@ body {
     background: var(--success); color: white; margin-top: 8px;
 }
 
+/* === ОТЗЫВЫ === */
 .reviews-section { margin-top: 24px; padding-top: 16px; border-top: 1px solid rgba(0,0,0,0.08); }
 .reviews-section h3 { font-size: 16px; margin-bottom: 12px; }
 .review-form { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
@@ -235,48 +228,51 @@ body {
 }
 .review-card { background: var(--card); padding: 14px; border-radius: 12px; margin-bottom: 10px; }
 .review-header { display: flex; justify-content: space-between; margin-bottom: 6px; }
-.review-author { font-size: 13px; font-weight: 700; }
+.review-author { font-size: 13px; font-weight: 700; color: var(--text); }
 .review-stars { color: #ffcc00; font-size: 14px; }
-.review-text { font-size: 13px; line-height: 1.5; }
+.review-text { font-size: 13px; line-height: 1.5; color: var(--text); }
 .review-date { font-size: 11px; color: var(--hint); margin-top: 6px; }
 
+/* === КОРЗИНА === */
 .cart-item {
     display: flex; gap: 12px; padding: 12px; background: var(--card);
     border-radius: 12px; margin-bottom: 8px; align-items: center;
 }
 .cart-item-img {
-    width: 60px; height: 60px; background: white; border-radius: 8px;
+    width: 60px; height: 60px; background: var(--bg); border-radius: 8px;
     display: flex; align-items: center; justify-content: center; font-size: 28px; flex-shrink: 0; overflow: hidden;
 }
 .cart-item-img img { width: 100%; height: 100%; object-fit: cover; }
 .cart-item-info { flex: 1; min-width: 0; }
-.cart-item-name { font-size: 13px; font-weight: 600; margin-bottom: 2px; }
+.cart-item-name { font-size: 13px; font-weight: 600; margin-bottom: 2px; color: var(--text); }
 .cart-item-price { font-size: 13px; color: var(--accent); font-weight: 700; }
 .qty-controls { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
 .qty-controls button {
     width: 28px; height: 28px; border-radius: 8px; border: none;
-    background: var(--bg); font-size: 16px; font-weight: 700; cursor: pointer;
+    background: var(--bg); font-size: 16px; font-weight: 700; cursor: pointer; color: var(--text);
 }
-.qty-controls span { font-size: 14px; font-weight: 700; min-width: 20px; text-align: center; }
+.qty-controls span { font-size: 14px; font-weight: 700; min-width: 20px; text-align: center; color: var(--text); }
 .cart-total {
     padding: 16px; background: var(--card); border-radius: 12px; margin-top: 12px;
-    display: flex; justify-content: space-between; font-size: 16px; font-weight: 800;
+    display: flex; justify-content: space-between; font-size: 16px; font-weight: 800; color: var(--text);
 }
 .cart-actions { margin-top: 12px; display: flex; flex-direction: column; gap: 8px; }
 .cart-actions button { padding: 14px; border-radius: 12px; border: none; font-size: 14px; font-weight: 700; cursor: pointer; }
 
+/* === ЗАКАЗЫ === */
 .order-card { background: var(--card); padding: 14px; border-radius: 12px; margin-bottom: 10px; }
 .order-header { display: flex; justify-content: space-between; margin-bottom: 8px; }
 .order-id { font-size: 12px; font-weight: 700; color: var(--hint); }
 .order-status { font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 8px; background: rgba(42,171,238,0.15); color: var(--accent); }
 .order-status.delivered { background: rgba(52,199,89,0.15); color: var(--success); }
-.order-items { font-size: 13px; margin-bottom: 8px; line-height: 1.5; }
-.order-total { font-size: 14px; font-weight: 800; text-align: right; }
+.order-items { font-size: 13px; margin-bottom: 8px; line-height: 1.5; color: var(--text); }
+.order-total { font-size: 14px; font-weight: 800; text-align: right; color: var(--text); }
 
+/* === АДМИНКА === */
 .admin-tabs { display: flex; gap: 8px; margin-bottom: 16px; }
 .admin-tab {
     flex: 1; padding: 10px; border-radius: 10px; border: 1px solid rgba(0,0,0,0.1);
-    background: transparent; font-size: 13px; font-weight: 600; cursor: pointer;
+    background: transparent; font-size: 13px; font-weight: 600; cursor: pointer; color: var(--text);
 }
 .admin-tab.active { background: var(--accent); color: white; border-color: var(--accent); }
 .admin-form { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
@@ -289,7 +285,7 @@ body {
     display: flex; justify-content: space-between; align-items: center;
     padding: 10px 12px; background: var(--card); border-radius: 10px; margin-bottom: 6px;
 }
-.admin-item-info { flex: 1; min-width: 0; font-size: 13px; }
+.admin-item-info { flex: 1; min-width: 0; font-size: 13px; color: var(--text); }
 .admin-item-info b { display: block; }
 .admin-item-info span { color: var(--hint); font-size: 11px; }
 .admin-del { background: var(--danger); color: white; border: none; width: 32px; height: 32px; border-radius: 8px; cursor: pointer; font-size: 14px; }
