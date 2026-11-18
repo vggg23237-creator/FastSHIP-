@@ -74,7 +74,7 @@ async function loadData() {
             id: x.id, name: x.name, price: x.price, oldPrice: x.old_price,
             category: x.category, subcategory: x.subcategory,
             emoji: x.emoji, image: x.image, images: imgs, badge: x.badge,
-            sizes: x.sizes || ['S','M','L','XL'], description: x.description,
+            sizes: x.sizes || ['S','M','L','XL'], description: x.description || '',
             stock: x.stock ?? 0,
             isAvailable: x.is_available ?? true,
             onOrder: x.on_order ?? false,
@@ -280,15 +280,16 @@ function changeQtyMain(productId, delta) {
 function openProduct(id) {
     const p = products.find(x => x.id === id);
     if (!p) return;
-    selectedSizes[id] = selectedSizes[id] || p.sizes[0];
+    selectedSizes[id] = selectedSizes[id] || (p.sizes && p.sizes[0]) || 'One Size';
     const isFav = favorites.includes(p.id);
     const st = stockStatus(p);
     const imgs = productImages(p);
     const pReviews = reviews.filter(r => r.productId === id && r.status === 'approved');
     const avg = pReviews.length ? (pReviews.reduce((s, r) => s + r.stars, 0) / pReviews.length).toFixed(1) : null;
 
-    let galleryHTML;
-    if (imgs.length) {
+    // Галерея
+    let galleryHTML = '';
+    if (imgs.length > 0) {
         galleryHTML = `
         <div class="gallery" id="gallery">
             <div class="gallery-track" id="galleryTrack">
@@ -301,7 +302,39 @@ function openProduct(id) {
             ` : ''}
         </div>`;
     } else {
-        galleryHTML = `<div class="product-detail-image">${p.emoji}</div>`;
+        galleryHTML = `<div class="product-detail-image" style="display:flex; align-items:center; justify-content:center; font-size:100px;">${p.emoji || '📦'}</div>`;
+    }
+
+    // Описание
+    const descHTML = (p.description && p.description.trim()) 
+        ? `<p style="font-size:14px;line-height:1.4;color:var(--text);padding:10px;background:rgba(0,0,0,0.03);border-radius:8px;">${p.description}</p>` 
+        : '';
+
+    // Размеры (скрываем, если пусто)
+    const sizesHTML = (p.sizes && p.sizes.length > 0)
+        ? `<div>
+            <p style="font-size:13px;color:var(--hint);margin-bottom:8px">Выберите размер:</p>
+            <div class="sizes" id="sizesContainer">${p.sizes.map(s => `<button class="size-btn ${selectedSizes[id]===s?'selected':''}" data-size="${s}">${s}</button>`).join('')}</div>
+           </div>`
+        : '';
+
+    // Блок действий
+    let actionsHTML = '';
+    if (st.canBuy) {
+        actionsHTML = `
+            <div class="detail-actions" style="display:flex; gap:8px; align-items:center; margin-top:4px;">
+                <button class="btn-secondary" id="detailFavBtn" style="flex:0 0 auto; width:48px; height:48px; display:flex; align-items:center; justify-content:center; font-size:20px; padding:0;">${isFav?'❤️':'🤍'}</button>
+                <button class="btn-secondary" id="shareBtn" style="flex:0 0 auto; width:48px; height:48px; display:flex; align-items:center; justify-content:center; font-size:18px; padding:0;">📤</button>
+                <button class="btn-primary" id="detailCartBtn" style="flex:1; height:48px;">В корзину</button>
+            </div>
+            <button class="detail-buy-now" id="detailBuyNowBtn" style="margin-top:8px; height:50px;">⚡ Купить сейчас</button>`;
+    } else {
+        actionsHTML = `
+            <div style="color:var(--danger); font-weight:600; text-align:center; padding:8px 0; font-size:15px;">Нет в наличии</div>
+            <div class="detail-actions" style="display:flex; gap:8px; align-items:center; justify-content:center;">
+                <button class="btn-secondary" id="detailFavBtn" style="flex:0 0 auto; padding:12px 20px; height:48px;">${isFav?'❤️ В избранном':'🤍 В избранное'}</button>
+                <button class="btn-secondary" id="shareBtn" style="flex:0 0 auto; padding:12px 20px; height:48px;">📤 Поделиться</button>
+            </div>`;
     }
 
     const similar = products.filter(x => x.category === p.category && x.id !== p.id).slice(0, 4);
@@ -321,40 +354,34 @@ function openProduct(id) {
         </div>` : '';
 
     const reviewsHTML = pReviews.length
-        ? pReviews.reverse().map(r => `<div class="review-card"><div class="review-header"><span class="review-author">${r.author}</span><span class="review-stars">${'★'.repeat(r.stars)}</span></div><div class="review-text">${r.text}</div><div class="review-date">${r.date}</div></div>`).join('')
+        ? pReviews.map(r => `<div class="review-card"><div class="review-header"><span class="review-author">${r.author}</span><span class="review-stars">${'★'.repeat(r.stars)}</span></div><div class="review-text">${r.text}</div><div class="review-date">${r.date}</div></div>`).join('')
         : '<p class="empty" style="padding:10px 0">Пока нет отзывов</p>';
 
     document.getElementById('productModalBody').innerHTML = `
-        <div class="product-detail">
+        <div class="product-detail" style="display:flex; flex-direction:column; gap:12px;">
             ${galleryHTML}
-            <h2>${p.name}</h2>
-            <div class="price-row"><span class="price">${formatPrice(p.price)}</span>${p.oldPrice ? `<span class="old-price">${formatPrice(p.oldPrice)}</span>` : ''}</div>
-            <div class="stock-status ${st.cls}">${st.label}${p.warehouse ? ' · 📦 '+p.warehouse : ''}</div>
-            ${avg ? `<div style="color:#ffcc00;">⭐ ${avg} · ${pReviews.length} отзывов</div>` : ''}
-            ${p.description ? `<p style="font-size:14px;line-height:1.4;color:var(--text);padding:10px;background:rgba(0,0,0,0.03);border-radius:8px">${p.description}</p>` : ''}
-            <p style="font-size:13px;color:var(--hint);margin-bottom:8px">Выберите размер:</p>
-            <div class="sizes" id="sizesContainer">${p.sizes.map(s => `<button class="size-btn ${selectedSizes[id]===s?'selected':''}" data-size="${s}">${s}</button>`).join('')}</div>
-            ${st.canBuy ? `
-                <div class="detail-actions">
-                    <button class="btn-secondary" id="detailFavBtn">${isFav?'❤️':'🤍'}</button>
-                    <button class="btn-secondary" id="shareBtn">📤 Поделиться</button>
-                    <button class="btn-primary" id="detailCartBtn">В корзину</button>
+            <div>
+                <h2 style="font-size:18px; font-weight:600; margin-bottom:4px;">${p.name}</h2>
+                <div class="price-row" style="display:flex; align-items:baseline; gap:10px;">
+                    <span class="price" style="font-size:22px; font-weight:bold; color:var(--accent);">${formatPrice(p.price)}</span>
+                    ${p.oldPrice ? `<span class="old-price" style="font-size:14px; color:var(--hint); text-decoration:line-through;">${formatPrice(p.oldPrice)}</span>` : ''}
                 </div>
-                <button class="detail-buy-now" id="detailBuyNowBtn">⚡ Купить сейчас</button>
-            ` : `
-                <div class="detail-actions">
-                    <button class="btn-secondary" id="detailFavBtn">${isFav?'❤️':'🤍'}</button>
-                    <button class="btn-secondary" id="shareBtn">📤 Поделиться</button>
-                </div>
-                <div class="stock-status out" style="text-align:center;padding:12px;">Нет в наличии</div>
-            `}
+                <div class="stock-status ${st.cls}" style="margin-top:6px; font-size:13px; font-weight:600;">${st.label}${p.warehouse ? ' · 📦 '+p.warehouse : ''}</div>
+                ${avg ? `<div style="color:#ffcc00; margin-top:4px; font-size:13px;">⭐ ${avg} · ${pReviews.length} отзывов</div>` : ''}
+            </div>
+            
+            ${descHTML}
+            ${sizesHTML}
+            ${actionsHTML}
             ${similarHTML}
-            <div class="reviews-section">
-                <h3>⭐ Отзывы (${pReviews.length})</h3>
+            
+            <div class="reviews-section" style="margin-top:16px;">
+                <h3 style="font-size:15px; margin-bottom:10px;">⭐ Отзывы (${pReviews.length})</h3>
                 <div>${reviewsHTML}</div>
             </div>
         </div>`;
 
+    // Галерея логика
     const gallery = document.getElementById('gallery');
     const track = document.getElementById('galleryTrack');
     const dots = document.querySelectorAll('#galleryDots [data-dot]');
@@ -390,35 +417,42 @@ function openProduct(id) {
         }, { passive: true });
     }
 
-    document.querySelectorAll('#sizesContainer .size-btn').forEach(btn => btn.addEventListener('click', () => {
-        selectedSizes[id] = btn.dataset.size;
-        document.querySelectorAll('#sizesContainer .size-btn').forEach(b => b.classList.remove('selected'));
-        btn.classList.add('selected');
-    }));
+    // Обработчики
+    if (sizesHTML) {
+        document.querySelectorAll('#sizesContainer .size-btn').forEach(btn => btn.addEventListener('click', () => {
+            selectedSizes[id] = btn.dataset.size;
+            document.querySelectorAll('#sizesContainer .size-btn').forEach(b => b.classList.remove('selected'));
+            btn.classList.add('selected');
+        }));
+    }
     document.getElementById('shareBtn').addEventListener('click', () => {
         const shareUrl = `https://t.me/share/url?url=https://t.me/${MANAGER_USERNAME}&text=Смотри: ${p.name} за ${formatPrice(p.price)}!`;
         if (tg) tg.openTelegramLink(shareUrl); else window.open(shareUrl, '_blank');
     });
     document.getElementById('detailFavBtn').addEventListener('click', () => { toggleFavorite(id); openProduct(id); });
+    
     if (st.canBuy) {
         document.getElementById('detailCartBtn').addEventListener('click', () => { addToCart(id); closeModal('productModal'); });
         document.getElementById('detailBuyNowBtn').addEventListener('click', () => buyNow(id));
     }
+    
     document.querySelectorAll('.product-detail [data-open-product]').forEach(el => el.addEventListener('click', () => { closeModal('productModal'); openProduct(+el.dataset.openProduct); }));
     openModal('productModal');
 }
 
 function showCheckoutForm(items, total, orderId) {
     document.getElementById('productModalBody').innerHTML = `
-        <div class="product-detail">
-            <h2>Оформление заказа</h2>
+        <div class="product-detail" style="display:flex; flex-direction:column; gap:12px;">
+            <h2 style="font-size:18px; font-weight:600; margin-bottom:4px;">Оформление заказа</h2>
             <p style="color:var(--hint); margin-bottom:16px;">Заполните данные для доставки.</p>
             <div class="review-form">
                 <input id="checkoutName" placeholder="Ваше Имя" value="${currentUser?.name || ''}">
                 <input id="checkoutPhone" type="tel" placeholder="Номер телефона">
                 <input id="checkoutAddress" placeholder="Город, адрес или Пункт выдачи">
             </div>
-            <div class="cart-total" style="margin-bottom:16px;"><span>К оплате:</span><span>${formatPrice(total)}</span></div>
+            <div class="cart-total" style="display:flex; justify-content:space-between; font-size:16px; font-weight:bold; padding:14px 0; border-top:1px solid rgba(0,0,0,0.06); margin-bottom:16px;">
+                <span>К оплате:</span><span>${formatPrice(total)}</span>
+            </div>
             <button class="btn-primary" id="confirmCheckoutBtn" style="width:100%; padding:16px; border-radius:12px; border:none; font-size:16px; font-weight:bold; margin-bottom:10px;">Подтвердить заказ</button>
             <button class="btn-secondary" id="cancelCheckoutBtn" style="width:100%; padding:14px; border-radius:12px; border:none;">Отмена</button>
         </div>`;
@@ -462,6 +496,7 @@ async function buyNow(id) {
     const items = [{ id: p.id, name: p.name, size: selectedSizes[id] || p.sizes[0], qty: 1, price: p.price }];
     showCheckoutForm(items, p.price, 'FS-' + Date.now().toString().slice(-6));
 }
+
 async function checkout() {
     if (!cart.length) return;
     const total = cart.reduce((s, c) => { const p = products.find(x => x.id === c.id); return s + (p ? p.price * c.qty : 0); }, 0);
@@ -822,7 +857,7 @@ function addToCart(id) {
         const inCart = cart.filter(c => c.id === id).reduce((s, c) => s + c.qty, 0);
         if (inCart >= p.stock) { if (tg) tg.showAlert('Больше нет на складе'); else alert('Больше нет на складе'); return; }
     }
-    const size = selectedSizes[id] || p.sizes[0];
+    const size = selectedSizes[id] || (p.sizes && p.sizes[0]) || 'One Size';
     const existing = cart.find(c => c.id === id && c.size === size);
     if (existing) existing.qty++; else cart.push({ id, size, qty: 1 });
     save('fs_cart', cart); updateCounts(); renderProducts();
@@ -841,6 +876,7 @@ function changeQty(index, delta) {
     if (item.qty <= 0) cart.splice(index, 1);
     save('fs_cart', cart); updateCounts(); renderCart(); renderProducts();
 }
+
 function removeCartItem(index) { cart.splice(index, 1); save('fs_cart', cart); updateCounts(); renderCart(); renderProducts(); }
 function openCart() { renderCart(); openModal('cartModal'); }
 
@@ -929,8 +965,8 @@ async function openReviewForm(orderCode) {
 
     const catOptions = reviewCategories.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
     document.getElementById('productModalBody').innerHTML = `
-        <div class="product-detail">
-            <h2>Отзыв по заказу ${orderCode}</h2>
+        <div class="product-detail" style="display:flex; flex-direction:column; gap:12px;">
+            <h2 style="font-size:18px; font-weight:600; margin-bottom:4px;">Отзыв по заказу ${orderCode}</h2>
             <p style="color:var(--hint);font-size:13px;margin-bottom:12px;">Отзыв появится в каталоге после проверки модератором.</p>
             <div class="review-form">
                 <select id="revCategory"><option value="">— Категория —</option>${catOptions}</select>
