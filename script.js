@@ -26,14 +26,13 @@ let searchQuery = '';
 let sortMode = 'default';
 let selectedSizes = {};
 let adminOrderFilter = 'new';
-let uploadedImageUrl = null; // Сюда сохраняем ссылку после загрузки фото
+let uploadedImageUrl = null;
 
 function load(k, d) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch { return d; } }
 function save(k, v) { localStorage.setItem(k, JSON.stringify(v)); }
 function formatPrice(p) { return p.toLocaleString('ru-RU') + ' ₽'; }
 function isAdmin() { return currentUser && ADMIN_IDS.includes(currentUser.id); }
 
-// === ЗАГРУЗКА ДАННЫХ ===
 async function loadData() {
     document.getElementById('productsGrid').innerHTML = '<p class="empty" style="grid-column:1/-1">Загрузка...</p>';
     const { data: c } = await db.from('categories').select('*').order('id');
@@ -53,7 +52,6 @@ async function loadData() {
     renderProducts(); updateCounts();
 }
 
-// === УВЕДОМЛЕНИЕ О КОРЗИНЕ ===
 function checkAbandonedCart() {
     if (cart.length > 0 && !sessionStorage.getItem('cart_notified')) {
         setTimeout(() => {
@@ -63,42 +61,27 @@ function checkAbandonedCart() {
     }
 }
 
-// === ЗАГРУЗКА ФОТО С ТЕЛЕФОНА ===
 async function handleImageUpload(event) {
     const file = event.target.files[0];
     if (!file) return;
-
     try {
         if (tg) tg.showAlert('Обработка фото...');
-        
-        // Сжимаем картинку (чтобы весила мало и сайт летал)
         const options = { maxSizeMB: 0.5, maxWidthOrHeight: 800, useWebWorker: true };
         const compressedFile = await imageCompression(file, options);
-        
-        // Генерируем уникальное имя файла
         const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.jpg`;
-
-        // Загружаем в Supabase Storage
         const { data, error } = await db.storage.from('images').upload(fileName, compressedFile, { contentType: 'image/jpeg' });
         if (error) throw error;
-
-        // Получаем публичную ссылку
         const { data: urlData } = db.storage.from('images').getPublicUrl(fileName);
         uploadedImageUrl = urlData.publicUrl;
-
-        // Показываем превью
         document.getElementById('photoPreview').innerHTML = `<img src="${uploadedImageUrl}" style="width:100%; height:100%; object-fit:cover; border-radius:8px;">`;
         document.getElementById('photoPreview').style.display = 'block';
-        
         if (tg) tg.HapticFeedback?.notificationOccurred('success');
     } catch (err) {
         console.error('Ошибка загрузки фото:', err);
-        if (tg) tg.showAlert('Ошибка загрузки фото. Попробуйте еще раз.');
-        else alert('Ошибка загрузки фото.');
+        if (tg) tg.showAlert('Ошибка загрузки фото.'); else alert('Ошибка загрузки фото.');
     }
 }
 
-// === РЕНДЕР КАТЕГОРИЙ ===
 function renderCategories() {
     const container = document.getElementById('categories');
     container.innerHTML = categories.map(c => `<button class="category ${currentCategory === c.slug ? 'active' : ''}" data-cat="${c.slug}">${c.name}</button>`).join('');
@@ -107,13 +90,11 @@ function renderCategories() {
     });
 }
 
-// === РЕНДЕР ТОВАРОВ ===
 function renderProducts() {
     const grid = document.getElementById('productsGrid');
     let filtered = products.filter(p => (currentCategory === 'all' || p.category === currentCategory) && p.name.toLowerCase().includes(searchQuery.toLowerCase()));
     if (sortMode === 'price-asc') filtered.sort((a, b) => a.price - b.price);
     else if (sortMode === 'price-desc') filtered.sort((a, b) => b.price - a.price);
-
     if (!filtered.length) { grid.innerHTML = `<p class="empty" style="grid-column:1/-1">Ничего не найдено 😕</p>`; return; }
 
     grid.innerHTML = filtered.map(p => {
@@ -162,7 +143,6 @@ function changeQtyMain(productId, delta) {
     if (idx >= 0) { cart[idx].qty += delta; if (cart[idx].qty <= 0) cart.splice(idx, 1); save('fs_cart', cart); updateCounts(); renderProducts(); }
 }
 
-// === КАРТОЧКА ТОВАРА ===
 function openProduct(id) {
     const p = products.find(x => x.id === id);
     if (!p) return;
@@ -171,7 +151,6 @@ function openProduct(id) {
     const pReviews = reviews.filter(r => r.productId === id).reverse();
     const avg = pReviews.length ? (pReviews.reduce((s, r) => s + r.stars, 0) / pReviews.length).toFixed(1) : null;
     const imgContent = p.image ? `<img src="${p.image}" alt="${p.name}">` : p.emoji;
-
     const similar = products.filter(x => x.category === p.category && x.id !== p.id).slice(0, 4);
     const similarHTML = similar.length ? `
         <div class="reviews-section">
@@ -180,7 +159,6 @@ function openProduct(id) {
                 ${similar.map(s => `<div style="min-width: 100px; width: 100px;" data-open-product="${s.id}"><div style="width:100%; aspect-ratio:1; border-radius:10px; background:var(--card); display:flex; align-items:center; justify-content:center; overflow:hidden; margin-bottom:4px;">${s.image?`<img src="${s.image}" style="width:100%;height:100%;object-fit:cover;">`:s.emoji}</div><div style="font-size:11px; font-weight:600; line-height:1.2; height:26px; overflow:hidden;">${s.name}</div><div style="font-size:12px; color:var(--accent); font-weight:bold;">${formatPrice(s.price)}</div></div>`).join('')}
             </div>
         </div>` : '';
-
     const reviewsHTML = pReviews.length ? pReviews.map(r => `<div class="review-card"><div class="review-header"><span class="review-author">${r.author}</span><span class="review-stars">${'★'.repeat(r.stars)}</span></div><div class="review-text">${r.text}</div><div class="review-date">${r.date}</div></div>`).join('') : '<p class="empty" style="padding:10px 0">Пока нет отзывов</p>';
 
     document.getElementById('productModalBody').innerHTML = `
@@ -221,7 +199,6 @@ function openProduct(id) {
     openModal('productModal');
 }
 
-// === ФОРМА ЗАКАЗА ===
 function showCheckoutForm(items, total, orderId) {
     document.getElementById('productModalBody').innerHTML = `
         <div class="product-detail">
@@ -254,7 +231,6 @@ function showCheckoutForm(items, total, orderId) {
 async function buyNow(id) { const p = products.find(x => x.id === id); if (!p) return; const items = [{ name: p.name, size: selectedSizes[id] || p.sizes[0], qty: 1, price: p.price }]; showCheckoutForm(items, p.price, 'FS-' + Date.now().toString().slice(-6)); }
 async function checkout() { if (!cart.length) return; const total = cart.reduce((s, c) => { const p = products.find(x => x.id === c.id); return s + (p ? p.price * c.qty : 0); }, 0); const items = cart.map(c => { const p = products.find(x => x.id === c.id); return { name: p.name, size: c.size, qty: c.qty, price: p.price }; }); closeModal('cartModal'); showCheckoutForm(items, total, 'FS-' + Date.now().toString().slice(-6)); }
 
-// === АДМИНКА ===
 async function openAdmin() { if (!isAdmin()) return alert('Нет доступа'); await loadData(); switchAdminTab('orders', document.querySelector('.admin-tab')); openModal('adminModal'); }
 
 async function switchAdminTab(tab, btn) {
@@ -298,7 +274,6 @@ async function switchAdminTab(tab, btn) {
                 <input id="newPrice" type="number" placeholder="Цена (₽)">
                 <select id="newCategory">${catOptions}</select>
                 
-                <!-- БЛОК ЗАГРУЗКИ ФОТО -->
                 <div style="margin: 10px 0;">
                     <button type="button" id="uploadPhotoBtn" style="width:100%; padding:12px; border-radius:10px; border:1px dashed var(--accent); background:transparent; color:var(--accent); font-weight:bold;">📸 Выбрать фото с телефона</button>
                     <div id="photoPreview" style="display:none; width:100px; height:100px; margin-top:10px; border-radius:8px; overflow:hidden; background:var(--bg);"></div>
@@ -312,7 +287,6 @@ async function switchAdminTab(tab, btn) {
             </div>
             <div>${products.map(p => `<div class="admin-item"><div class="admin-item-info"><b>${p.name}</b><span>${formatPrice(p.price)}</span></div><button class="admin-del" style="background:var(--accent); margin-right:4px;" data-edit-product="${p.id}">✏️</button><button class="admin-del" data-del-product="${p.id}">🗑</button></div>`).join('')}</div>`;
         
-        // Обработчик выбора фото
         document.getElementById('uploadPhotoBtn').addEventListener('click', () => document.getElementById('fileInput').click());
         
         document.getElementById('addProductBtn').addEventListener('click', adminAddProduct);
@@ -330,14 +304,9 @@ async function switchAdminTab(tab, btn) {
 async function adminAddProduct() {
     const name = document.getElementById('newName').value.trim(); const price = +document.getElementById('newPrice').value; const category = document.getElementById('newCategory').value; const description = document.getElementById('newDescription').value.trim();
     if (!name || !price) return alert('Заполни название и цену');
-    
-    // Используем загруженную ссылку (если она есть)
     await db.from('products').insert([{ name, price, category, image: uploadedImageUrl, description, sizes: ['S','M','L','XL'] }]);
-    
-    // Очищаем превью и ссылку после добавления
     uploadedImageUrl = null;
     document.getElementById('photoPreview').style.display = 'none';
-    
     await loadData(); switchAdminTab('products', document.querySelectorAll('.admin-tab')[1]);
 }
 
@@ -347,7 +316,6 @@ async function adminEditProduct(id) { const p = products.find(x => x.id === id);
 async function adminDeleteProduct(id) { if (!confirm('Удалить?')) return; await db.from('products').delete().eq('id', id); await loadData(); switchAdminTab('products', document.querySelectorAll('.admin-tab')[1]); }
 async function adminDeleteReview(id) { if (!confirm('Удалить?')) return; await db.from('reviews').delete().eq('id', id); await loadData(); switchAdminTab('reviews', document.querySelectorAll('.admin-tab')[2]); }
 
-// === ВСПОМОГАТЕЛЬНЫЕ ===
 function addToCart(id) { const p = products.find(x => x.id === id); if (!p) return; const size = selectedSizes[id] || p.sizes[0]; const existing = cart.find(c => c.id === id && c.size === size); if (existing) existing.qty++; else cart.push({ id, size, qty: 1 }); save('fs_cart', cart); updateCounts(); renderProducts(); if (tg) tg.HapticFeedback?.impactOccurred('medium'); }
 function changeQty(index, delta) { cart[index].qty += delta; if (cart[index].qty <= 0) cart.splice(index, 1); save('fs_cart', cart); updateCounts(); renderCart(); renderProducts(); }
 function removeCartItem(index) { cart.splice(index, 1); save('fs_cart', cart); updateCounts(); renderCart(); renderProducts(); }
@@ -388,8 +356,7 @@ function closeModal(id) { document.getElementById(id).classList.remove('open'); 
 function openManagerChat(msg) { if (!msg || !msg.trim()) return; const url = `https://t.me/${MANAGER_USERNAME}?text=${encodeURIComponent(msg + '\u200B'.repeat(3))}`; if (tg && tg.openTelegramLink) tg.openTelegramLink(url); else window.open(url, '_blank'); }
 
 document.addEventListener('DOMContentLoaded', () => {
-    document.getElementById('fileInput').addEventListener('change', handleImageUpload); // Слушаем выбор файла
-    
+    document.getElementById('fileInput').addEventListener('change', handleImageUpload);
     document.getElementById('searchInput').addEventListener('input', (e) => { searchQuery = e.target.value; renderProducts(); });
     document.getElementById('sortSelect').addEventListener('change', (e) => { sortMode = e.target.value; renderProducts(); });
     document.getElementById('btnFav').addEventListener('click', openFavorites);
