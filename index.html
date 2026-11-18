@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>FastSHIP — Магазин</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <!-- Библиотека Supabase -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <link rel="stylesheet" href="style.css">
 </head>
@@ -38,14 +37,15 @@
         </select>
     </div>
 
-    <!-- Категории подгружаются из базы -->
+    <!-- Категории товаров -->
     <div class="categories" id="categories"></div>
+    <!-- Подкатегории товаров (создаются динамически в script.js) -->
 
     <main class="products" id="productsGrid"></main>
 
     <a class="floating-btn" href="https://t.me/FastSHIPmanager" target="_blank">💬 Заказать у менеджера</a>
 
-    <!-- Модальное окно товара -->
+    <!-- Модальное окно товара / формы отзыва / оформления заказа -->
     <div class="modal" id="productModal">
         <div class="modal-content">
             <button class="modal-close" data-close="productModal">✕</button>
@@ -53,7 +53,7 @@
         </div>
     </div>
 
-    <!-- Модальное окно корзины -->
+    <!-- Корзина -->
     <div class="modal" id="cartModal">
         <div class="modal-content">
             <button class="modal-close" data-close="cartModal">✕</button>
@@ -63,7 +63,7 @@
         </div>
     </div>
 
-    <!-- Модальное окно избранного -->
+    <!-- Избранное -->
     <div class="modal" id="favoritesModal">
         <div class="modal-content">
             <button class="modal-close" data-close="favoritesModal">✕</button>
@@ -72,7 +72,7 @@
         </div>
     </div>
 
-    <!-- Модальное окно отзывов -->
+    <!-- Отзывы клиента -->
     <div class="modal" id="reviewsModal">
         <div class="modal-content">
             <button class="modal-close" data-close="reviewsModal">✕</button>
@@ -81,7 +81,7 @@
         </div>
     </div>
 
-    <!-- Модальное окно заказов клиента -->
+    <!-- Мои заказы -->
     <div class="modal" id="ordersModal">
         <div class="modal-content">
             <button class="modal-close" data-close="ordersModal">✕</button>
@@ -90,7 +90,7 @@
         </div>
     </div>
 
-    <!-- Модальное окно Админки -->
+    <!-- Админка -->
     <div class="modal" id="adminModal">
         <div class="modal-content">
             <button class="modal-close" data-close="adminModal">✕</button>
