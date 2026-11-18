@@ -25,7 +25,7 @@ let currentCategory = 'all';
 let searchQuery = '';
 let sortMode = 'default';
 let selectedSizes = {};
-let adminOrderFilter = 'new';
+let adminOrderFilter = 'active'; // По умолчанию показываем только активные
 let uploadedImageUrl = null;
 
 function load(k, d) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch { return d; } }
@@ -47,7 +47,11 @@ async function loadData() {
 
     if (isAdmin()) {
         const { data: o } = await db.from('orders').select('*').order('id', { ascending: false });
-        if (o) orders = o.map(x => ({ id: x.order_code, items: x.items, total: x.total, status: x.status, date: x.date, address: x.address, phone: x.phone, user: { id: x.user_id, name: x.user_name, username: x.user_username } }));
+        if (o) orders = o.map(x => ({ 
+            id: x.order_code, items: x.items, total: x.total, status: x.status, date: x.date, 
+            address: x.address, phone: x.phone, tracking: x.tracking_number,
+            user: { id: x.user_id, name: x.user_name, username: x.user_username } 
+        }));
     }
     renderProducts(); updateCounts();
 }
@@ -240,9 +244,10 @@ async function switchAdminTab(tab, btn) {
     if (tab === 'orders') {
         const totalSum = orders.filter(o => o.status !== 'rejected').reduce((s, o) => s + o.total, 0);
         const avgCheck = orders.filter(o => o.status !== 'rejected').length ? Math.round(totalSum / orders.filter(o => o.status !== 'rejected').length) : 0;
+        
         let filteredOrders = orders;
-        if (adminOrderFilter === 'active') filteredOrders = orders.filter(o => o.status !== 'rejected' && o.status !== 'delivered');
-        else if (adminOrderFilter === 'archive') filteredOrders = orders.filter(o => o.status === 'rejected' || o.status === 'delivered');
+        if (adminOrderFilter === 'active') filteredOrders = orders.filter(o => o.status !== 'archived' && o.status !== 'rejected' && o.status !== 'delivered');
+        else if (adminOrderFilter === 'archive') filteredOrders = orders.filter(o => o.status === 'archived' || o.status === 'rejected' || o.status === 'delivered');
 
         body.innerHTML = `
             <div style="background:var(--card); padding:12px; border-radius:12px; margin-bottom:16px; display:flex; justify-content:space-between; text-align:center;">
@@ -251,19 +256,46 @@ async function switchAdminTab(tab, btn) {
                 <div><div style="font-size:11px;color:var(--hint)">Всего</div><div style="font-weight:bold;">${orders.length}</div></div>
             </div>
             <div style="display:flex; gap:8px; margin-bottom:12px;">
-                <button class="size-btn ${adminOrderFilter==='all'?'selected':''}" data-filter="all" style="flex:1;font-size:11px;">Все</button>
                 <button class="size-btn ${adminOrderFilter==='active'?'selected':''}" data-filter="active" style="flex:1;font-size:11px;">Активные</button>
                 <button class="size-btn ${adminOrderFilter==='archive'?'selected':''}" data-filter="archive" style="flex:1;font-size:11px;">Архив</button>
             </div>
             <div>${filteredOrders.map(o => {
-                const isNew = o.status === 'new'; const userInfo = o.user ? `<div style="font-size:12px;color:var(--hint);margin-bottom:6px">👤 ${o.user.name} (${o.user.username})<br>📞 ${o.phone || '—'}<br>🏠 ${o.address || '—'}</div>` : '';
-                return `<div class="order-card"><div class="order-header"><span class="order-id">${o.id}</span><span class="order-status">${statusLabel(o.status)}</span></div>${userInfo}<div class="order-items">${o.items.map(i => `${i.name} (${i.size}) × ${i.qty}`).join('<br>')}</div><div class="order-total">${formatPrice(o.total)}</div>${isNew ? `<div style="display:flex; gap:8px; margin-top:12px;"><button class="btn-primary" style="flex:1; padding:10px; font-size:13px;" data-accept-order="${o.id}">✅ Принять</button><button class="btn-secondary" style="flex:1; padding:10px; font-size:13px; background:var(--danger); color:white;" data-reject-order="${o.id}">❌ Отклонить</button></div>` : `<div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">${['processing','shipped','delivered'].map(s => `<button class="size-btn ${o.status===s?'selected':''}" data-set-status="${o.id}|${s}">${statusLabel(s)}</button>`).join('')}</div>`}</div>`;
+                const isNew = o.status === 'new'; 
+                const userInfo = o.user ? `<div style="font-size:12px;color:var(--hint);margin-bottom:6px">👤 ${o.user.name} (${o.user.username})<br>📞 ${o.phone || '—'}<br>🏠 ${o.address || '—'}</div>` : '';
+                return `
+                <div class="order-card">
+                    <div class="order-header"><span class="order-id">${o.id}</span><span class="order-status">${statusLabel(o.status)}</span></div>
+                    ${userInfo}
+                    <div class="order-items">${o.items.map(i => `${i.name} (${i.size}) × ${i.qty}`).join('<br>')}</div>
+                    <div class="order-total">${formatPrice(o.total)}</div>
+                    
+                    ${isNew ? `
+                    <div style="display:flex; gap:8px; margin-top:12px;">
+                        <button class="btn-primary" style="flex:1; padding:10px; font-size:13px;" data-accept-order="${o.id}">✅ Принять</button>
+                        <button class="btn-secondary" style="flex:1; padding:10px; font-size:13px; background:var(--danger); color:white;" data-reject-order="${o.id}">❌ Отклонить</button>
+                    </div>` : `
+                    <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">
+                        ${['processing','shipped','delivered'].map(s => `<button class="size-btn ${o.status===s?'selected':''}" data-set-status="${o.id}|${s}">${statusLabel(s)}</button>`).join('')}
+                    </div>
+                    <div style="margin-top:8px; display:flex; gap:8px; align-items:center;">
+                        <input type="text" id="track_${o.id}" placeholder="Трек-номер" value="${o.tracking || ''}" style="flex:1; padding:8px; border-radius:8px; border:1px solid rgba(0,0,0,0.1); font-size:12px;">
+                        <button class="btn-secondary" style="padding:8px 12px; font-size:12px;" data-save-track="${o.id}">💾</button>
+                        <button class="btn-secondary" style="padding:8px 12px; font-size:12px; background:#555; color:white;" data-archive-order="${o.id}">📦 В архив</button>
+                    </div>
+                    `}
+                </div>`;
             }).join('')}</div>`;
         
         document.querySelectorAll('[data-filter]').forEach(b => b.addEventListener('click', () => { adminOrderFilter = b.dataset.filter; switchAdminTab('orders', document.querySelector('.admin-tab')); }));
         document.querySelectorAll('[data-accept-order]').forEach(b => b.addEventListener('click', () => setOrderStatus(b.dataset.acceptOrder, 'processing')));
         document.querySelectorAll('[data-reject-order]').forEach(b => b.addEventListener('click', () => { if(confirm('Отклонить?')) setOrderStatus(b.dataset.rejectOrder, 'rejected'); }));
         document.querySelectorAll('[data-set-status]').forEach(b => b.addEventListener('click', () => { const [id, status] = b.dataset.setStatus.split('|'); setOrderStatus(id, status); }));
+        document.querySelectorAll('[data-archive-order]').forEach(b => b.addEventListener('click', () => setOrderStatus(b.dataset.archiveOrder, 'archived')));
+        document.querySelectorAll('[data-save-track]').forEach(b => b.addEventListener('click', () => {
+            const id = b.dataset.saveTrack;
+            const track = document.getElementById(`track_${id}`).value.trim();
+            saveTracking(id, track);
+        }));
     }
 
     if (tab === 'products') {
@@ -273,12 +305,10 @@ async function switchAdminTab(tab, btn) {
                 <input id="newName" placeholder="Название товара">
                 <input id="newPrice" type="number" placeholder="Цена (₽)">
                 <select id="newCategory">${catOptions}</select>
-                
                 <div style="margin: 10px 0;">
                     <button type="button" id="uploadPhotoBtn" style="width:100%; padding:12px; border-radius:10px; border:1px dashed var(--accent); background:transparent; color:var(--accent); font-weight:bold;">📸 Выбрать фото с телефона</button>
                     <div id="photoPreview" style="display:none; width:100px; height:100px; margin-top:10px; border-radius:8px; overflow:hidden; background:var(--bg);"></div>
                 </div>
-
                 <textarea id="newDescription" placeholder="Описание" rows="2"></textarea>
                 <button id="addProductBtn">➕ Добавить товар</button>
             </div>
@@ -288,7 +318,6 @@ async function switchAdminTab(tab, btn) {
             <div>${products.map(p => `<div class="admin-item"><div class="admin-item-info"><b>${p.name}</b><span>${formatPrice(p.price)}</span></div><button class="admin-del" style="background:var(--accent); margin-right:4px;" data-edit-product="${p.id}">✏️</button><button class="admin-del" data-del-product="${p.id}">🗑</button></div>`).join('')}</div>`;
         
         document.getElementById('uploadPhotoBtn').addEventListener('click', () => document.getElementById('fileInput').click());
-        
         document.getElementById('addProductBtn').addEventListener('click', adminAddProduct);
         document.getElementById('addCatBtn').addEventListener('click', adminAddCategory);
         document.querySelectorAll('[data-del-product]').forEach(b => b.addEventListener('click', () => adminDeleteProduct(+b.dataset.delProduct)));
@@ -299,6 +328,12 @@ async function switchAdminTab(tab, btn) {
         body.innerHTML = `<div>${reviews.map(r => `<div class="admin-item"><div class="admin-item-info"><b>${r.author}</b><span>${r.text}</span></div><button class="admin-del" data-del-review="${r.id}">🗑</button></div>`).join('')}</div>`;
         document.querySelectorAll('[data-del-review]').forEach(b => b.addEventListener('click', () => adminDeleteReview(+b.dataset.delReview)));
     }
+}
+
+async function saveTracking(code, track) {
+    await db.from('orders').update({ tracking_number: track }).eq('order_code', code);
+    if (tg) tg.HapticFeedback?.notificationOccurred('success');
+    alert('Трек-номер сохранен!');
 }
 
 async function adminAddProduct() {
@@ -348,8 +383,19 @@ function openFavorites() {
 }
 function openReviews() { const body = document.getElementById('reviewsBody'); body.innerHTML = reviews.length ? reviews.slice().reverse().map(r => `<div class="review-card"><div class="review-header"><span class="review-author">${r.author}</span><span class="review-stars">${'★'.repeat(r.stars)}</span></div><div class="review-text">${r.text}</div></div>`).join('') : '<p class="empty">Отзывов нет</p>'; openModal('reviewsModal'); }
 async function submitReview(productId) { const author = document.getElementById('revName').value.trim(); const stars = +document.getElementById('revStars').value; const text = document.getElementById('revText').value.trim(); if (!author || !text) { alert('Заполни имя и текст'); return; } await db.from('reviews').insert([{ product_id: productId, author, stars, text, date: new Date().toLocaleDateString('ru-RU') }]); await loadData(); openProduct(productId); }
-async function openOrders() { const body = document.getElementById('ordersBody'); const { data } = await db.from('orders').select('*').eq('user_id', currentUser.id).order('id', { ascending: false }); body.innerHTML = data?.length ? data.map(o => `<div class="order-card"><div class="order-header"><span class="order-id">${o.order_code}</span><span class="order-status">${statusLabel(o.status)}</span></div><div class="order-items">${o.items.map(i => `${i.name} (${i.size})`).join(', ')}</div><div class="order-total">${formatPrice(o.total)}</div></div>`).join('') : '<p class="empty">Нет заказов</p>'; openModal('ordersModal'); }
-function statusLabel(s) { return { new: 'В обработке', processing: 'Собирается', shipped: 'В пути', delivered: 'Доставлен', rejected: 'Отменен' }[s] || s; }
+async function openOrders() { 
+    const body = document.getElementById('ordersBody'); 
+    const { data } = await db.from('orders').select('*').eq('user_id', currentUser.id).neq('status', 'archived').order('id', { ascending: false }); 
+    body.innerHTML = data?.length ? data.map(o => `
+        <div class="order-card">
+            <div class="order-header"><span class="order-id">${o.order_code}</span><span class="order-status">${statusLabel(o.status)}</span></div>
+            <div class="order-items">${o.items.map(i => `${i.name} (${i.size})`).join(', ')}</div>
+            <div class="order-total">${formatPrice(o.total)}</div>
+            ${o.tracking_number ? `<div style="margin-top:8px; padding:8px; background:rgba(42,171,238,0.1); border-radius:8px; font-size:13px;">📦 Трек-номер: <b>${o.tracking_number}</b></div>` : ''}
+        </div>`).join('') : '<p class="empty">Нет заказов</p>'; 
+    openModal('ordersModal'); 
+}
+function statusLabel(s) { return { new: 'В обработке', processing: 'Собирается', shipped: 'В пути', delivered: 'Доставлен', rejected: 'Отменен', archived: 'Архив' }[s] || s; }
 function updateCounts() { document.getElementById('cartCount').textContent = cart.reduce((s, c) => s + c.qty, 0) || ''; document.getElementById('favCount').textContent = favorites.length || ''; }
 function openModal(id) { document.getElementById(id).classList.add('open'); }
 function closeModal(id) { document.getElementById(id).classList.remove('open'); }
