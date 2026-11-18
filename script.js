@@ -4,29 +4,24 @@ console.log('SCRIPT LOADED', new Date().toISOString());
 const tg = window.Telegram?.WebApp;
 if (tg) { tg.ready(); tg.expand(); }
 
-// === НАСТРОЙКИ (ТВОИ КЛЮЧИ) ===
+// === НАСТРОЙКИ ===
 const MANAGER_USERNAME = 'FastSHIPmanager';
-const ADMIN_IDS = [7866142145]; // Твой ID
+const ADMIN_IDS = [7866142145];
 
 const SUPABASE_URL = 'https://xbjobhftqrudawlqctqo.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_1eXNfiQRiZUF-Qm6w3Rjfg_-kCIo8Nl';
 
 const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-// === Автоматическая регистрация ===
 let currentUser = null;
 if (tg && tg.initDataUnsafe && tg.initDataUnsafe.user) {
     const u = tg.initDataUnsafe.user;
-    currentUser = {
-        id: u.id,
-        name: `${u.first_name || ''} ${u.last_name || ''}`.trim(),
-        username: u.username ? `@${u.username}` : 'нет username'
-    };
+    currentUser = { id: u.id, name: `${u.first_name || ''} ${u.last_name || ''}`.trim(), username: u.username ? `@${u.username}` : 'нет username' };
 }
 
-// === Состояние ===
 let products = [];
 let reviews = [];
+let categories = []; // Новая переменная для категорий
 let cart = load('fs_cart', []);
 let favorites = load('fs_favorites', []);
 let orders = [];
@@ -40,40 +35,59 @@ function save(k, v) { localStorage.setItem(k, JSON.stringify(v)); }
 function formatPrice(p) { return p.toLocaleString('ru-RU') + ' ₽'; }
 function isAdmin() { return currentUser && ADMIN_IDS.includes(currentUser.id); }
 
-// === ЗАГРУЗКА ДАННЫХ ИЗ БАЗЫ ===
+// === ЗАГРУЗКА ДАННЫХ ===
 async function loadData() {
     document.getElementById('productsGrid').innerHTML = '<p class="empty" style="grid-column:1/-1">Загрузка товаров...</p>';
 
-    const { data: p, error: pErr } = await db.from('products').select('*').order('id');
-    if (!pErr && p) {
+    // Загружаем категории
+    const { data: c } = await db.from('categories').select('*').order('id');
+    categories = c || [];
+    renderCategories();
+
+    // Загружаем товары
+    const { data: p } = await db.from('products').select('*').order('id');
+    if (p) {
         products = p.map(x => ({
             id: x.id, name: x.name, price: x.price, oldPrice: x.old_price,
             category: x.category, emoji: x.emoji, image: x.image, badge: x.badge, 
             sizes: x.sizes, description: x.description
         }));
-    } else if (pErr) {
-        console.error('Ошибка загрузки товаров:', pErr);
     }
     
-    const { data: r, error: rErr } = await db.from('reviews').select('*');
-    if (!rErr && r) {
-        reviews = r.map(x => ({
-            id: x.id, productId: x.product_id, author: x.author, stars: x.stars, text: x.text, date: x.date
-        }));
+    // Загружаем отзывы
+    const { data: r } = await db.from('reviews').select('*');
+    if (r) {
+        reviews = r.map(x => ({ id: x.id, productId: x.product_id, author: x.author, stars: x.stars, text: x.text, date: x.date }));
     }
 
+    // Загружаем заказы (если админ)
     if (isAdmin()) {
-        const { data: o, error: oErr } = await db.from('orders').select('*').order('id', { ascending: false });
-        if (!oErr && o) {
-            orders = o.map(x => ({
-                id: x.order_code, items: x.items, total: x.total, status: x.status,
-                date: x.date, user: { id: x.user_id, name: x.user_name, username: x.user_username }
-            }));
+        const { data: o } = await db.from('orders').select('*').order('id', { ascending: false });
+        if (o) {
+            orders = o.map(x => ({ id: x.order_code, items: x.items, total: x.total, status: x.status, date: x.date, user: { id: x.user_id, name: x.user_name, username: x.user_username } }));
         }
     }
     
     renderProducts();
     updateCounts();
+}
+
+// === РЕНДЕР КАТЕГОРИЙ ===
+function renderCategories() {
+    const container = document.getElementById('categories');
+    container.innerHTML = categories.map(c => `
+        <button class="category ${currentCategory === c.slug ? 'active' : ''}" data-cat="${c.slug}">${c.name}</button>
+    `).join('');
+
+    // Навешиваем обработчики
+    container.querySelectorAll('.category').forEach(btn => {
+        btn.addEventListener('click', () => {
+            container.querySelectorAll('.category').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            currentCategory = btn.dataset.cat;
+            renderProducts();
+        });
+    });
 }
 
 // === СООБЩЕНИЕ МЕНЕДЖЕРУ ===
@@ -109,7 +123,6 @@ async function buyNow(id) {
     }]);
 
     if (isAdmin()) await loadData();
-    
     const msg = buildOrderMessage(items, total, orderId);
     if (tg) tg.HapticFeedback?.notificationOccurred('success');
     closeModal('productModal');
@@ -248,10 +261,7 @@ async function submitReview(productId) {
     const text = document.getElementById('revText').value.trim();
     if (!author || !text) { alert('Заполни имя и текст'); return; }
     
-    await db.from('reviews').insert([{
-        product_id: productId, author, stars, text, date: new Date().toLocaleDateString('ru-RU')
-    }]);
-    
+    await db.from('reviews').insert([{ product_id: productId, author, stars, text, date: new Date().toLocaleDateString('ru-RU') }]);
     await loadData();
     if (tg) tg.HapticFeedback?.notificationOccurred('success');
     openProduct(productId);
@@ -310,11 +320,7 @@ async function checkout() {
     const dateStr = now.toLocaleDateString('ru-RU') + ' ' + now.toLocaleTimeString('ru-RU', {hour: '2-digit', minute: '2-digit'});
     const items = cart.map(c => { const p = products.find(x => x.id === c.id); return { name: p.name, size: c.size, qty: c.qty, price: p.price }; });
 
-    await db.from('orders').insert([{
-        order_code: orderId, items, total, status: 'new', date: dateStr,
-        user_id: currentUser?.id, user_name: currentUser?.name, user_username: currentUser?.username
-    }]);
-
+    await db.from('orders').insert([{ order_code: orderId, items, total, status: 'new', date: dateStr, user_id: currentUser?.id, user_name: currentUser?.name, user_username: currentUser?.username }]);
     if (isAdmin()) await loadData();
     
     const msg = buildOrderMessage(items, total, orderId);
@@ -370,10 +376,8 @@ function openReviews() {
 async function openOrders() {
     const body = document.getElementById('ordersBody');
     if (!currentUser) { body.innerHTML = '<p class="empty">Войдите в Telegram</p>'; openModal('ordersModal'); return; }
-    
     const { data } = await db.from('orders').select('*').eq('user_id', currentUser.id).order('id', { ascending: false });
     const myOrders = data || [];
-    
     body.innerHTML = myOrders.length ? myOrders.map(o => `
         <div class="order-card">
             <div class="order-header"><span class="order-id">${o.order_code}</span><span class="order-status">${statusLabel(o.status)}</span></div>
@@ -384,9 +388,7 @@ async function openOrders() {
     openModal('ordersModal');
 }
 
-function statusLabel(s) {
-    return { new: 'На проверке', processing: 'Принят в работу', shipped: 'В пути', delivered: 'Доставлен', rejected: 'Отклонен' }[s] || s;
-}
+function statusLabel(s) { return { new: 'На проверке', processing: 'Принят в работу', shipped: 'В пути', delivered: 'Доставлен', rejected: 'Отклонен' }[s] || s; }
 
 // === АДМИНКА ===
 async function openAdmin() {
@@ -414,8 +416,29 @@ async function switchAdminTab(tab, btn) {
     }
 
     if (tab === 'products') {
-        body.innerHTML = `<div class="admin-form"><input id="newName" placeholder="Название товара"><input id="newPrice" type="number" placeholder="Цена (₽)"><input id="newOldPrice" type="number" placeholder="Старая цена"><select id="newCategory"><option value="hoodie">Худи</option><option value="tshirt">Футболки</option><option value="pants">Штаны</option><option value="jacket">Куртки</option></select><input id="newEmoji" placeholder="Эмодзи 🧥" maxlength="4"><input id="newImage" placeholder="Ссылка на фото"><input id="newBadge" placeholder="Бейдж (NEW)"><textarea id="newDescription" placeholder="Описание товара (ткань, крой и т.д.)" rows="2"></textarea><button id="addProductBtn">➕ Добавить товар</button></div><div>${products.map(p => `<div class="admin-item"><div class="admin-item-info"><b>${p.emoji} ${p.name}</b><span>${formatPrice(p.price)} · ${p.category}</span></div><button class="admin-del" data-del-product="${p.id}">🗑</button></div>`).join('')}</div>`;
+        const catOptions = categories.filter(c => c.slug !== 'all').map(c => `<option value="${c.slug}">${c.name}</option>`).join('');
+        body.innerHTML = `
+            <div class="admin-form">
+                <input id="newName" placeholder="Название товара">
+                <input id="newPrice" type="number" placeholder="Цена (₽)">
+                <input id="newOldPrice" type="number" placeholder="Старая цена">
+                <select id="newCategory">${catOptions}</select>
+                <input id="newEmoji" placeholder="Эмодзи 🧥" maxlength="4">
+                <input id="newImage" placeholder="Ссылка на фото">
+                <input id="newBadge" placeholder="Бейдж (NEW)">
+                <textarea id="newDescription" placeholder="Описание товара" rows="2"></textarea>
+                <button id="addProductBtn">➕ Добавить товар</button>
+            </div>
+            <div style="margin-bottom:16px; border-top:1px solid rgba(0,0,0,0.1); padding-top:16px;">
+                <h4 style="margin-bottom:8px;">Добавить категорию</h4>
+                <div style="display:flex; gap:8px;">
+                    <input id="newCatName" placeholder="Название (напр. Сумки)" style="flex:1; padding:10px; border-radius:10px; border:1px solid rgba(0,0,0,0.1); background:var(--bg); color:var(--text);">
+                    <button id="addCatBtn" style="padding:10px; border:none; border-radius:10px; background:var(--success); color:white; font-weight:bold;">Добавить</button>
+                </div>
+            </div>
+            <div>${products.map(p => `<div class="admin-item"><div class="admin-item-info"><b>${p.emoji} ${p.name}</b><span>${formatPrice(p.price)} · ${p.category}</span></div><button class="admin-del" data-del-product="${p.id}">🗑</button></div>`).join('')}</div>`;
         document.getElementById('addProductBtn').addEventListener('click', adminAddProduct);
+        document.getElementById('addCatBtn').addEventListener('click', adminAddCategory);
         document.querySelectorAll('[data-del-product]').forEach(b => b.addEventListener('click', () => adminDeleteProduct(+b.dataset.delProduct)));
     }
 
@@ -432,6 +455,15 @@ async function setOrderStatus(code, status) {
     switchAdminTab('orders', document.querySelector('.admin-tab'));
 }
 
+async function adminAddCategory() {
+    const name = document.getElementById('newCatName').value.trim();
+    if (!name) return;
+    const slug = name.toLowerCase().replace(/[^a-zа-я0-9]/g, '-');
+    await db.from('categories').insert([{ name, slug }]);
+    await loadData();
+    switchAdminTab('products', document.querySelectorAll('.admin-tab')[1]);
+}
+
 async function adminAddProduct() {
     const name = document.getElementById('newName').value.trim();
     const price = +document.getElementById('newPrice').value;
@@ -443,11 +475,7 @@ async function adminAddProduct() {
     const description = document.getElementById('newDescription').value.trim() || null;
 
     if (!name || !price) { alert('Заполни название и цену'); return; }
-
-    await db.from('products').insert([{
-        name, price, old_price: oldPrice, category, emoji, image: image || null, badge, sizes: ['S','M','L','XL'], description
-    }]);
-    
+    await db.from('products').insert([{ name, price, old_price: oldPrice, category, emoji, image: image || null, badge, sizes: ['S','M','L','XL'], description }]);
     await loadData();
     switchAdminTab('products', document.querySelectorAll('.admin-tab')[1]);
 }
@@ -465,11 +493,7 @@ async function adminAddReview() {
     const stars = +document.getElementById('revStars').value;
     const text = document.getElementById('revText').value.trim();
     if (!author || !text) { alert('Заполни имя и текст'); return; }
-    
-    await db.from('reviews').insert([{
-        product_id: productId, author, stars, text, date: new Date().toLocaleDateString('ru-RU')
-    }]);
-    
+    await db.from('reviews').insert([{ product_id: productId, author, stars, text, date: new Date().toLocaleDateString('ru-RU') }]);
     await loadData();
     switchAdminTab('reviews', document.querySelectorAll('.admin-tab')[2]);
 }
@@ -493,15 +517,6 @@ function closeModal(id) { document.getElementById(id).classList.remove('open'); 
 
 // === СТАРТ ===
 document.addEventListener('DOMContentLoaded', () => {
-    document.querySelectorAll('.category').forEach(btn => {
-        btn.addEventListener('click', () => {
-            document.querySelectorAll('.category').forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-            currentCategory = btn.dataset.cat;
-            renderProducts();
-        });
-    });
-
     document.getElementById('searchInput').addEventListener('input', (e) => { searchQuery = e.target.value; renderProducts(); });
     document.getElementById('sortSelect').addEventListener('change', (e) => { sortMode = e.target.value; renderProducts(); });
     document.getElementById('btnFav').addEventListener('click', openFavorites);
@@ -517,7 +532,6 @@ document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('.admin-tab').forEach(btn => btn.addEventListener('click', () => switchAdminTab(btn.dataset.tab, btn)));
 
     if (isAdmin()) document.getElementById('navAdmin').style.display = 'flex';
-    
     loadData();
     updateCounts();
 });
