@@ -30,7 +30,7 @@ let searchQuery = '';
 let sortMode = 'default';
 let selectedSizes = {};
 let adminOrderFilter = 'active';
-let uploadedImageUrl = null;
+let uploadedImages = [];
 
 function load(k, d) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch { return d; } }
 function save(k, v) { localStorage.setItem(k, JSON.stringify(v)); }
@@ -42,6 +42,12 @@ function stockStatus(p) {
     if (p.stock > 0) return { label: `В наличии: ${p.stock} шт.`, cls: 'in', canBuy: true };
     if (p.onOrder) return { label: 'Под заказ', cls: 'order', canBuy: true };
     return { label: 'Нет в наличии', cls: 'out', canBuy: false };
+}
+
+function productImages(p) {
+    if (Array.isArray(p.images) && p.images.length) return p.images.filter(Boolean);
+    if (p.image) return [p.image];
+    return [];
 }
 
 async function loadData() {
@@ -59,16 +65,22 @@ async function loadData() {
 
     const { data: p, error: pe } = await db.from('products').select('*').order('id');
     if (pe) console.error('products error:', pe);
-    if (p) products = p.map(x => ({
-        id: x.id, name: x.name, price: x.price, oldPrice: x.old_price,
-        category: x.category, subcategory: x.subcategory,
-        emoji: x.emoji, image: x.image, badge: x.badge,
-        sizes: x.sizes || ['S','M','L','XL'], description: x.description,
-        stock: x.stock ?? 0,
-        isAvailable: x.is_available ?? true,
-        onOrder: x.on_order ?? false,
-        warehouse: x.warehouse || ''
-    }));
+    if (p) products = p.map(x => {
+        let imgs = [];
+        if (Array.isArray(x.images)) imgs = x.images;
+        else if (typeof x.images === 'string') { try { imgs = JSON.parse(x.images); } catch {} }
+        if ((!imgs || !imgs.length) && x.image) imgs = [x.image];
+        return {
+            id: x.id, name: x.name, price: x.price, oldPrice: x.old_price,
+            category: x.category, subcategory: x.subcategory,
+            emoji: x.emoji, image: x.image, images: imgs, badge: x.badge,
+            sizes: x.sizes || ['S','M','L','XL'], description: x.description,
+            stock: x.stock ?? 0,
+            isAvailable: x.is_available ?? true,
+            onOrder: x.on_order ?? false,
+            warehouse: x.warehouse || ''
+        };
+    });
 
     const { data: r, error: re } = await db.from('reviews').select('*').order('id', { ascending: false });
     if (re) console.error('reviews error:', re);
@@ -104,25 +116,41 @@ function checkAbandonedCart() {
     }
 }
 
-async function handleImageUpload(event) {
-    const file = event.target.files[0];
-    if (!file) return;
-    try {
-        if (tg) tg.showAlert('Обработка фото...');
-        const options = { maxSizeMB: 0.5, maxWidthOrHeight: 800, useWebWorker: true };
-        const compressedFile = await imageCompression(file, options);
-        const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.jpg`;
-        const { error } = await db.storage.from('images').upload(fileName, compressedFile, { contentType: 'image/jpeg' });
-        if (error) throw error;
-        const { data: urlData } = db.storage.from('images').getPublicUrl(fileName);
-        uploadedImageUrl = urlData.publicUrl;
-        document.getElementById('photoPreview').innerHTML = `<img src="${uploadedImageUrl}" style="width:100%; height:100%; object-fit:cover; border-radius:8px;">`;
-        document.getElementById('photoPreview').style.display = 'block';
-        if (tg) tg.HapticFeedback?.notificationOccurred('success');
-    } catch (err) {
-        console.error('Ошибка загрузки фото:', err);
-        if (tg) tg.showAlert('Ошибка загрузки фото.'); else alert('Ошибка загрузки фото.');
+async function handleImagesSelect(event) {
+    const files = Array.from(event.target.files || []);
+    if (!files.length) return;
+    if (tg) tg.showAlert('Загружаем фото...');
+    for (const file of files) {
+        try {
+            const compressed = await imageCompression(file, { maxSizeMB: 0.5, maxWidthOrHeight: 800, useWebWorker: true });
+            const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.jpg`;
+            const { error } = await db.storage.from('images').upload(fileName, compressed, { contentType: 'image/jpeg' });
+            if (error) throw error;
+            const { data: urlData } = db.storage.from('images').getPublicUrl(fileName);
+            uploadedImages.push(urlData.publicUrl);
+        } catch (err) {
+            console.error('Ошибка загрузки:', err);
+        }
     }
+    renderUploadedPhotos();
+    event.target.value = '';
+    if (tg) tg.HapticFeedback?.notificationOccurred('success');
+}
+
+function renderUploadedPhotos() {
+    const box = document.getElementById('uploadedPhotos');
+    if (!box) return;
+    if (!uploadedImages.length) { box.innerHTML = ''; return; }
+    box.innerHTML = uploadedImages.map((url, i) => `
+        <div class="uploaded-photo">
+            <img src="${url}" alt="">
+            <button type="button" class="remove-photo" data-remove-photo="${i}">✕</button>
+        </div>
+    `).join('');
+    box.querySelectorAll('[data-remove-photo]').forEach(b => b.addEventListener('click', () => {
+        uploadedImages.splice(+b.dataset.removePhoto, 1);
+        renderUploadedPhotos();
+    }));
 }
 
 function renderCategories() {
@@ -189,10 +217,11 @@ function renderProducts() {
     grid.innerHTML = filtered.map(p => {
         const isFav = favorites.includes(p.id);
         const st = stockStatus(p);
+        const imgs = productImages(p);
         const pReviews = reviews.filter(r => r.productId === p.id && r.status === 'approved');
         const avg = pReviews.length ? (pReviews.reduce((s, r) => s + r.stars, 0) / pReviews.length).toFixed(1) : null;
         const rating = avg ? `⭐ ${avg} (${pReviews.length})` : '⭐ Нет отзывов';
-        const imgContent = p.image ? `<img src="${p.image}" alt="${p.name}">` : p.emoji;
+        const imgContent = imgs.length ? `<img src="${imgs[0]}" alt="${p.name}" loading="lazy">` : p.emoji;
         const inCartCount = cart.filter(c => c.id === p.id).reduce((sum, c) => sum + c.qty, 0);
         const cartActionHTML = inCartCount > 0 ? `
             <div style="display: flex; align-items: center; justify-content: space-between; background: var(--success); border-radius: 10px; padding: 4px;">
@@ -206,6 +235,7 @@ function renderProducts() {
             <div class="product-image" data-open-product="${p.id}">
                 ${p.badge ? `<span class="product-badge">${p.badge}</span>` : ''}
                 <button class="fav-btn" data-fav="${p.id}">${isFav ? '❤️' : '🤍'}</button>
+                ${imgs.length > 1 ? `<span class="photos-count">📷 ${imgs.length}</span>` : ''}
                 ${imgContent}
             </div>
             <div class="product-info">
@@ -253,24 +283,50 @@ function openProduct(id) {
     selectedSizes[id] = selectedSizes[id] || p.sizes[0];
     const isFav = favorites.includes(p.id);
     const st = stockStatus(p);
+    const imgs = productImages(p);
     const pReviews = reviews.filter(r => r.productId === id && r.status === 'approved');
     const avg = pReviews.length ? (pReviews.reduce((s, r) => s + r.stars, 0) / pReviews.length).toFixed(1) : null;
-    const imgContent = p.image ? `<img src="${p.image}" alt="${p.name}">` : p.emoji;
+
+    let galleryHTML;
+    if (imgs.length) {
+        galleryHTML = `
+        <div class="gallery" id="gallery">
+            <div class="gallery-track" id="galleryTrack">
+                ${imgs.map(u => `<div class="gallery-slide"><img src="${u}" alt="${p.name}"></div>`).join('')}
+            </div>
+            ${imgs.length > 1 ? `
+                <button class="gallery-arrow prev" id="galleryPrev">‹</button>
+                <button class="gallery-arrow next" id="galleryNext">›</button>
+                <div class="gallery-dots" id="galleryDots">${imgs.map((_,i) => `<span class="gallery-dot ${i===0?'active':''}" data-dot="${i}"></span>`).join('')}</div>
+            ` : ''}
+        </div>`;
+    } else {
+        galleryHTML = `<div class="product-detail-image">${p.emoji}</div>`;
+    }
+
     const similar = products.filter(x => x.category === p.category && x.id !== p.id).slice(0, 4);
     const similarHTML = similar.length ? `
         <div class="reviews-section">
             <h3>Похожие товары</h3>
             <div style="display: flex; gap: 8px; overflow-x: auto; padding-bottom: 10px;">
-                ${similar.map(s => `<div style="min-width: 100px; width: 100px;" data-open-product="${s.id}"><div style="width:100%; aspect-ratio:1; border-radius:10px; background:var(--card); display:flex; align-items:center; justify-content:center; overflow:hidden; margin-bottom:4px;">${s.image?`<img src="${s.image}" style="width:100%;height:100%;object-fit:cover;">`:s.emoji}</div><div style="font-size:11px; font-weight:600; line-height:1.2; height:26px; overflow:hidden;">${s.name}</div><div style="font-size:12px; color:var(--accent); font-weight:bold;">${formatPrice(s.price)}</div></div>`).join('')}
+                ${similar.map(s => {
+                    const sImg = productImages(s)[0];
+                    return `<div style="min-width: 100px; width: 100px;" data-open-product="${s.id}">
+                        <div style="width:100%; aspect-ratio:1; border-radius:10px; background:var(--card); display:flex; align-items:center; justify-content:center; overflow:hidden; margin-bottom:4px;">${sImg?`<img src="${sImg}" style="width:100%;height:100%;object-fit:cover;">`:s.emoji}</div>
+                        <div style="font-size:11px; font-weight:600; line-height:1.2; height:26px; overflow:hidden;">${s.name}</div>
+                        <div style="font-size:12px; color:var(--accent); font-weight:bold;">${formatPrice(s.price)}</div>
+                    </div>`;
+                }).join('')}
             </div>
         </div>` : '';
+
     const reviewsHTML = pReviews.length
         ? pReviews.reverse().map(r => `<div class="review-card"><div class="review-header"><span class="review-author">${r.author}</span><span class="review-stars">${'★'.repeat(r.stars)}</span></div><div class="review-text">${r.text}</div><div class="review-date">${r.date}</div></div>`).join('')
         : '<p class="empty" style="padding:10px 0">Пока нет отзывов</p>';
 
     document.getElementById('productModalBody').innerHTML = `
         <div class="product-detail">
-            <div class="product-detail-image">${imgContent}</div>
+            ${galleryHTML}
             <h2>${p.name}</h2>
             <div class="price-row"><span class="price">${formatPrice(p.price)}</span>${p.oldPrice ? `<span class="old-price">${formatPrice(p.oldPrice)}</span>` : ''}</div>
             <div class="stock-status ${st.cls}">${st.label}${p.warehouse ? ' · 📦 '+p.warehouse : ''}</div>
@@ -298,6 +354,41 @@ function openProduct(id) {
                 <div>${reviewsHTML}</div>
             </div>
         </div>`;
+
+    const gallery = document.getElementById('gallery');
+    const track = document.getElementById('galleryTrack');
+    const dots = document.querySelectorAll('#galleryDots [data-dot]');
+    let galleryIndex = 0;
+    function updateGallery() {
+        if (!track) return;
+        track.style.transform = `translateX(-${galleryIndex * 100}%)`;
+        dots.forEach((d, i) => d.classList.toggle('active', i === galleryIndex));
+    }
+    if (gallery && imgs.length > 1) {
+        document.getElementById('galleryPrev').addEventListener('click', () => {
+            galleryIndex = (galleryIndex - 1 + imgs.length) % imgs.length;
+            updateGallery();
+        });
+        document.getElementById('galleryNext').addEventListener('click', () => {
+            galleryIndex = (galleryIndex + 1) % imgs.length;
+            updateGallery();
+        });
+        dots.forEach(d => d.addEventListener('click', () => {
+            galleryIndex = +d.dataset.dot;
+            updateGallery();
+        }));
+        let startX = 0;
+        gallery.addEventListener('touchstart', e => { startX = e.touches[0].clientX; }, { passive: true });
+        gallery.addEventListener('touchend', e => {
+            const dx = e.changedTouches[0].clientX - startX;
+            if (Math.abs(dx) > 40) {
+                galleryIndex = dx > 0
+                    ? (galleryIndex - 1 + imgs.length) % imgs.length
+                    : (galleryIndex + 1) % imgs.length;
+                updateGallery();
+            }
+        }, { passive: true });
+    }
 
     document.querySelectorAll('#sizesContainer .size-btn').forEach(btn => btn.addEventListener('click', () => {
         selectedSizes[id] = btn.dataset.size;
@@ -446,6 +537,7 @@ async function switchAdminTab(tab, btn) {
     }
 
     if (tab === 'products') {
+        uploadedImages = [];
         const catOptions = categories.filter(c => c.slug !== 'all').map(c => `<option value="${c.slug}">${c.name}</option>`).join('');
         body.innerHTML = `
             <div class="admin-form">
@@ -462,8 +554,8 @@ async function switchAdminTab(tab, btn) {
                     <input id="newOnOrder" type="checkbox" style="width:auto;"> Под заказ
                 </label>
                 <div style="margin: 10px 0;">
-                    <button type="button" id="uploadPhotoBtn" style="width:100%; padding:12px; border-radius:10px; border:1px dashed var(--accent); background:transparent; color:var(--accent); font-weight:bold;">📸 Выбрать фото с телефона</button>
-                    <div id="photoPreview" style="display:none; width:100px; height:100px; margin-top:10px; border-radius:8px; overflow:hidden; background:var(--bg);"></div>
+                    <button type="button" id="uploadPhotoBtn" style="width:100%; padding:12px; border-radius:10px; border:1px dashed var(--accent); background:transparent; color:var(--accent); font-weight:bold;">📸 Загрузить фото (можно несколько)</button>
+                    <div id="uploadedPhotos" class="uploaded-photos"></div>
                 </div>
                 <textarea id="newDescription" placeholder="Описание" rows="2"></textarea>
                 <button id="addProductBtn">➕ Добавить товар</button>
@@ -502,11 +594,18 @@ async function switchAdminTab(tab, btn) {
 
             <div>${products.map(p => {
                 const st = stockStatus(p);
+                const imgs = productImages(p);
+                const thumb = imgs[0] || null;
                 return `<div class="admin-item" style="flex-direction:column;align-items:stretch;">
                     <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
-                        <div class="admin-item-info">
-                            <b>${p.name}</b>
-                            <span>${formatPrice(p.price)} · <span class="stock-status ${st.cls}">${st.label}</span>${p.warehouse?' · 📦 '+p.warehouse:''}</span>
+                        <div style="display:flex;gap:8px;align-items:center;flex:1;min-width:0;">
+                            <div style="width:40px;height:40px;border-radius:8px;background:var(--card);display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0;font-size:20px;">
+                                ${thumb ? `<img src="${thumb}" style="width:100%;height:100%;object-fit:cover;">` : p.emoji}
+                            </div>
+                            <div class="admin-item-info">
+                                <b>${p.name}</b>
+                                <span>${formatPrice(p.price)} · <span class="stock-status ${st.cls}">${st.label}</span>${p.warehouse?' · 📦 '+p.warehouse:''}${imgs.length>1?' · 📷'+imgs.length:''}</span>
+                            </div>
                         </div>
                         <div style="display:flex;gap:4px;">
                             <button class="admin-del" style="background:var(--accent);" data-edit-product="${p.id}">✏️</button>
@@ -599,12 +698,12 @@ async function adminAddProduct() {
     if (!name || !price) return alert('Заполни название и цену');
     await db.from('products').insert([{
         name, price, old_price: oldPrice, category, subcategory,
-        image: uploadedImageUrl, description, sizes: ['S','M','L','XL'],
+        images: uploadedImages,
+        image: uploadedImages[0] || '',
+        description, sizes: ['S','M','L','XL'],
         stock, warehouse, on_order: onOrder, is_available: true
     }]);
-    uploadedImageUrl = null;
-    const pv = document.getElementById('photoPreview');
-    if (pv) pv.style.display = 'none';
+    uploadedImages = [];
     await loadData();
     switchAdminTab('products', document.querySelectorAll('.admin-tab')[1]);
 }
@@ -754,7 +853,8 @@ function renderCart() {
         const p = products.find(x => x.id === c.id);
         if (!p) return '';
         total += p.price * c.qty;
-        const imgContent = p.image ? `<img src="${p.image}" alt="">` : p.emoji;
+        const imgs = productImages(p);
+        const imgContent = imgs.length ? `<img src="${imgs[0]}" alt="">` : p.emoji;
         return `<div class="cart-item"><div class="cart-item-img">${imgContent}</div><div class="cart-item-info"><div class="cart-item-name">${p.name}</div><div style="font-size:11px;color:var(--hint)">Размер: ${c.size}</div><div class="cart-item-price">${formatPrice(p.price * c.qty)}</div><div class="qty-controls"><button data-qty-dec="${i}">−</button><span>${c.qty}</span><button data-qty-inc="${i}">+</button><button style="margin-left:auto;background:var(--danger);color:white" data-qty-del="${i}">🗑</button></div></div></div>`;
     }).join('');
     footer.innerHTML = `<div class="cart-total"><span>Итого:</span><span>${formatPrice(total)}</span></div><div class="cart-actions"><button class="btn-primary" id="checkoutBtn">📦 Оформить заказ</button></div>`;
@@ -778,7 +878,8 @@ function openFavorites() {
         body.innerHTML = favorites.map(id => {
             const p = products.find(x => x.id === id);
             if (!p) return '';
-            const imgContent = p.image ? `<img src="${p.image}" alt="">` : p.emoji;
+            const imgs = productImages(p);
+            const imgContent = imgs.length ? `<img src="${imgs[0]}" alt="">` : p.emoji;
             return `<div class="cart-item"><div class="cart-item-img" data-open-product="${p.id}">${imgContent}</div><div class="cart-item-info" data-open-product="${p.id}"><div class="cart-item-name">${p.name}</div><div class="cart-item-price">${formatPrice(p.price)}</div></div><button class="admin-del" data-unfav="${id}">✕</button></div>`;
         }).join('');
         document.querySelectorAll('#favoritesBody [data-open-product]').forEach(el => el.addEventListener('click', () => { closeModal('favoritesModal'); openProduct(+el.dataset.openProduct); }));
@@ -896,7 +997,7 @@ function closeModal(id) { document.getElementById(id).classList.remove('open'); 
 function openManagerChat(msg) { if (!msg || !msg.trim()) return; const url = `https://t.me/${MANAGER_USERNAME}?text=${encodeURIComponent(msg + '\u200B'.repeat(3))}`; if (tg && tg.openTelegramLink) tg.openTelegramLink(url); else window.open(url, '_blank'); }
 
 document.addEventListener('DOMContentLoaded', () => {
-    document.getElementById('fileInput').addEventListener('change', handleImageUpload);
+    document.getElementById('fileInput').addEventListener('change', handleImagesSelect);
     document.getElementById('searchInput').addEventListener('input', (e) => { searchQuery = e.target.value; renderProducts(); });
     document.getElementById('sortSelect').addEventListener('change', (e) => { sortMode = e.target.value; renderProducts(); });
     document.getElementById('btnFav').addEventListener('click', openFavorites);
