@@ -10,11 +10,7 @@
 </head>
 <body>
     <header class="header">
-        <div class="logo-container">
-            <div class="logo">
-                <img src="logo.png" alt="FastSHIP">
-            </div>
-        </div>
+        <div class="logo-container"><div class="logo"><img src="logo.png" alt="FastSHIP"></div></div>
         <div class="header-actions">
             <button class="icon-btn" id="btnFav">❤️<span class="badge-count" id="favCount"></span></button>
             <button class="icon-btn" id="btnCart">🛒<span class="badge-count" id="cartCount"></span></button>
@@ -24,9 +20,7 @@
 
     <div class="banner">🚚 Бесплатная доставка от 5000 ₽ · Доставка 2–5 дней</div>
 
-    <div class="search-container">
-        <input type="text" id="searchInput" placeholder="Поиск товаров...">
-    </div>
+    <div class="search-container"><input type="text" id="searchInput" placeholder="Поиск товаров..."></div>
 
     <div class="sort-container">
         <select id="sortSelect">
@@ -38,13 +32,10 @@
     </div>
 
     <div class="categories" id="categories"></div>
-    <!-- подкатегории создаются динамически -->
-
     <main class="products" id="productsGrid"></main>
 
     <a class="floating-btn" href="https://t.me/FastSHIPmanager" target="_blank">💬 Заказать у менеджера</a>
 
-    <!-- Модальное окно товара / формы отзыва / оформления заказа -->
     <div class="modal" id="productModal">
         <div class="modal-content">
             <button class="modal-close" data-close="productModal">✕</button>
@@ -52,7 +43,6 @@
         </div>
     </div>
 
-    <!-- Корзина -->
     <div class="modal" id="cartModal">
         <div class="modal-content">
             <button class="modal-close" data-close="cartModal">✕</button>
@@ -62,7 +52,6 @@
         </div>
     </div>
 
-    <!-- Избранное -->
     <div class="modal" id="favoritesModal">
         <div class="modal-content">
             <button class="modal-close" data-close="favoritesModal">✕</button>
@@ -71,7 +60,6 @@
         </div>
     </div>
 
-    <!-- Отзывы клиента -->
     <div class="modal" id="reviewsModal">
         <div class="modal-content">
             <button class="modal-close" data-close="reviewsModal">✕</button>
@@ -80,7 +68,6 @@
         </div>
     </div>
 
-    <!-- Мои заказы -->
     <div class="modal" id="ordersModal">
         <div class="modal-content">
             <button class="modal-close" data-close="ordersModal">✕</button>
@@ -89,7 +76,6 @@
         </div>
     </div>
 
-    <!-- Админка -->
     <div class="modal" id="adminModal">
         <div class="modal-content">
             <button class="modal-close" data-close="adminModal">✕</button>
@@ -112,6 +98,6 @@
 
     <input type="file" id="fileInput" accept="image/*" style="display: none;">
     <script src="https://cdn.jsdelivr.net/npm/browser-image-compression@2.0.2/dist/browser-image-compression.js"></script>
-    <script src="script.js"></script>
+    <script src="script.js?v=3"></script>
 </body>
 </html>
