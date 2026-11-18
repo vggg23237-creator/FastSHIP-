@@ -38,13 +38,14 @@
         </select>
     </div>
 
-    <!-- Категории теперь загружаются динамически из базы -->
+    <!-- Категории подгружаются из базы -->
     <div class="categories" id="categories"></div>
 
     <main class="products" id="productsGrid"></main>
 
     <a class="floating-btn" href="https://t.me/FastSHIPmanager" target="_blank">💬 Заказать у менеджера</a>
 
+    <!-- Модальное окно товара -->
     <div class="modal" id="productModal">
         <div class="modal-content">
             <button class="modal-close" data-close="productModal">✕</button>
@@ -52,6 +53,7 @@
         </div>
     </div>
 
+    <!-- Модальное окно корзины -->
     <div class="modal" id="cartModal">
         <div class="modal-content">
             <button class="modal-close" data-close="cartModal">✕</button>
@@ -61,6 +63,7 @@
         </div>
     </div>
 
+    <!-- Модальное окно избранного -->
     <div class="modal" id="favoritesModal">
         <div class="modal-content">
             <button class="modal-close" data-close="favoritesModal">✕</button>
@@ -69,6 +72,7 @@
         </div>
     </div>
 
+    <!-- Модальное окно отзывов -->
     <div class="modal" id="reviewsModal">
         <div class="modal-content">
             <button class="modal-close" data-close="reviewsModal">✕</button>
@@ -77,6 +81,7 @@
         </div>
     </div>
 
+    <!-- Модальное окно заказов клиента -->
     <div class="modal" id="ordersModal">
         <div class="modal-content">
             <button class="modal-close" data-close="ordersModal">✕</button>
@@ -85,6 +90,7 @@
         </div>
     </div>
 
+    <!-- Модальное окно Админки -->
     <div class="modal" id="adminModal">
         <div class="modal-content">
             <button class="modal-close" data-close="adminModal">✕</button>
@@ -98,12 +104,17 @@
         </div>
     </div>
 
+    <!-- Нижнее меню -->
     <nav class="bottom-nav">
         <button id="navHome">🏠<span>Главная</span></button>
         <button id="navOrders">📦<span>Заказы</span></button>
         <button id="navReviews">⭐<span>Отзывы</span></button>
         <button id="navAdmin" style="display:none">⚙️<span>Админ</span></button>
     </nav>
+
+    <!-- Скрытое поле для выбора фото и библиотека сжатия -->
+    <input type="file" id="fileInput" accept="image/*" style="display: none;">
+    <script src="https://cdn.jsdelivr.net/npm/browser-image-compression@2.0.2/dist/browser-image-compression.js"></script>
 
     <script src="script.js"></script>
 </body>
