@@ -21,7 +21,7 @@ if (tg && tg.initDataUnsafe && tg.initDataUnsafe.user) {
 
 let products = [];
 let reviews = [];
-let categories = []; // Новая переменная для категорий
+let categories = [];
 let cart = load('fs_cart', []);
 let favorites = load('fs_favorites', []);
 let orders = [];
@@ -39,12 +39,17 @@ function isAdmin() { return currentUser && ADMIN_IDS.includes(currentUser.id); }
 async function loadData() {
     document.getElementById('productsGrid').innerHTML = '<p class="empty" style="grid-column:1/-1">Загрузка товаров...</p>';
 
-    // Загружаем категории
-    const { data: c } = await db.from('categories').select('*').order('id');
-    categories = c || [];
+    // 1. Загружаем категории
+    const { data: c, error: cErr } = await db.from('categories').select('*').order('id');
+    if (!cErr && c) {
+        categories = c;
+    } else {
+        console.error('Ошибка загрузки категорий:', cErr);
+        categories = [{name: 'Все', slug: 'all'}]; // Заглушка, чтобы не падало
+    }
     renderCategories();
 
-    // Загружаем товары
+    // 2. Загружаем товары
     const { data: p } = await db.from('products').select('*').order('id');
     if (p) {
         products = p.map(x => ({
@@ -54,13 +59,13 @@ async function loadData() {
         }));
     }
     
-    // Загружаем отзывы
+    // 3. Загружаем отзывы
     const { data: r } = await db.from('reviews').select('*');
     if (r) {
         reviews = r.map(x => ({ id: x.id, productId: x.product_id, author: x.author, stars: x.stars, text: x.text, date: x.date }));
     }
 
-    // Загружаем заказы (если админ)
+    // 4. Загружаем заказы (если админ)
     if (isAdmin()) {
         const { data: o } = await db.from('orders').select('*').order('id', { ascending: false });
         if (o) {
@@ -79,7 +84,6 @@ function renderCategories() {
         <button class="category ${currentCategory === c.slug ? 'active' : ''}" data-cat="${c.slug}">${c.name}</button>
     `).join('');
 
-    // Навешиваем обработчики
     container.querySelectorAll('.category').forEach(btn => {
         btn.addEventListener('click', () => {
             container.querySelectorAll('.category').forEach(b => b.classList.remove('active'));
