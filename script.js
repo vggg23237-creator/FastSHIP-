@@ -4,7 +4,7 @@ const tg = window.Telegram?.WebApp;
 if (tg) { tg.ready(); tg.expand(); }
 
 const MANAGER_USERNAME = 'FastSHIPmanager';
-const ADMIN_IDS = [7866142145];
+const ADMIN_IDS = [7866142145, 9009257713];
 const SUPABASE_URL = 'https://xbjobhftqrudawlqctqo.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_1eXNfiQRiZUF-Qm6w3Rjfg_-kCIo8Nl';
 const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
